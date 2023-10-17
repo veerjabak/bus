@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Google Maps</title>
+    <style>
+      body {
+        background-color: #f5f5f5;
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #ffffff;
+        box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+      }
+      .menu {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      #searchInput {
+        display: none; /* Initially hide the search input */
+        margin-right: 10px;
+      }
+      #map {
+        box-shadow: 4px rgba(0, 0, 0, 0.1);
+        margin: 20px auto;
+        height: 300px;
+        width: 100%;
+        flex-grow: 1;
+      }
+      #busStopsTable {
+        margin-top: 20px;
+      }
+      /* Style for the bus stops table */
+      #busStopsTable h2 {
+        margin-bottom: 10px;
+      }
+      #busStopsTable table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+      #busStopsTable th,
+      #busStopsTable td {
+        padding: 8px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+      }
+      thead th {
+        background-color: #087f5b;
+        color: #fff;
+        width: 25%;
+      }
+      tbody tr:nth-child(odd) {
+        background-color: #f8f9fa;
+      }
+      tbody tr:nth-child(even) {
+        background-color: #e9ecef;
+      }
+      .search-button {
+        cursor: pointer;
+        background-color: #087f5b;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        padding: 8px 16px;
+        margin-left: 10px;
+      }
+      .search-button:hover {
+        background-color: #065c45;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="menu">
+        <input type="text" id="searchInput" placeholder="Enter Route Number" />
+        <!-- datalist comes here -->
+        <button class="search-button" onclick="toggleSearch()">Search</button>
+      </div>
+      <div id="map"></div>
+      <table id="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+    <script>
+      let map;
+      let markers = [];
+
+      function initMap() {
+        map = new google.maps.Map(document.getElementById("map"), {
+          center: { lat: 13.0827, lng: 80.2707 },
+          zoom: 12,
+        });
+      }
+
+      function createMarker(lat, lng, name, time) {
+        const marker = new google.maps.Marker({
+          position: { lat: parseFloat(lat), lng: parseFloat(lng) },
+          map: map,
+          title: `${name} - ${time}`,
+        });
+
+        const infoWindow = new google.maps.InfoWindow({
+          content: `<strong>${name}</strong><br>Arrival Time: ${time}<br>
+     <a href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}" target="_blank">Open in Google Maps</a>`,
+        });
+
+        marker.addListener("click", () => {
+          infoWindow.open(map, marker);
+        });
+
+        markers.push(marker);
+      }
+
+      function clearMarkers() {
+        markers.forEach((marker) => {
+          marker.setMap(null);
+        });
+        markers = [];
+      }
+
+      function toggleSearch() {
+        const searchInput = document.getElementById("searchInput");
+        const mapDiv = document.getElementById("map");
+        const table = document.getElementById("table");
+
+        if (searchInput.style.display === "none") {
+          searchInput.style.display = "inline-block";
+          mapDiv.style.display = "none";
+          table.style.display = "none";
+        } else {
+          searchInput.style.display = "none";
+          mapDiv.style.display = "block";
+          table.style.display = "block";
+          clearMarkers();
+          filterByRoute();
+        }
+      }
+
+      function filterByRoute() {
+        clearMarkers();
+        const routeNumber = document
+          .getElementById("searchInput")
+          .value.trim()
+          .toLowerCase();
+        const tableBody = document.getElementById("tableBody");
+
+        fetch("searchroute_num.csv")
+          .then((response) => response.text())
+          .then((data) => {
+            const rows = data.split("\n");
+            console.log(rows);
+            tableBody.innerHTML = "";
+
+            let currentRoute = "";
+            let isRouteData = false;
+
+            for (let i = 0; i < rows.length; i++) {
+              const line = rows[i].trim().toLowerCase(); // Convert to lowercase
+
+              if (line === routeNumber) {
+                currentRoute = routeNumber;
+                isRouteData = true;
+              } else if (isRouteData && line && !line.includes("end")) {
+                // Skip lines with "END" markers
+                const columns = line.split(",");
+                const name = columns[0];
+                const time = columns[1];
+                const latitude = columns[2];
+                const longitude = columns[3];
+
+                // inserting into the table
+
+                const newRow = tableBody.insertRow();
+                const cell1 = newRow.insertCell(0);
+                const cell2 = newRow.insertCell(1);
+
+                cell1.innerHTML = name;
+                cell2.innerHTML = time;
+
+                createMarker(latitude, longitude, name, time);
+              } else if (isRouteData && line.includes("end")) {
+                // End of route data
+                isRouteData = false;
+              }
+            }
+          })
+          .catch((error) => console.error("Error:", error));
+      }
+    </script>
+    <script
+      src="https://maps.googleapis.com/maps/api/js?key={API KEY}&callback=initMap"
+      async
+      defer
+    ></script>
+  </body>
+</html>
